@@ -36,3 +36,5 @@ supabase/.temp/
 # ─── Misc ───
 *.log
 .vercel
+
+.vercel
