@@ -9,6 +9,9 @@ import {
   localToUtcIso,
   utcToLocalDateAndTimeString,
   formatTimeWithAbbr,
+  IST_TIMEZONE,
+  EINDHOVEN_TIMEZONE,
+  formatDateInTz,
 } from '@/lib/timezones'
 
 interface AvailabilityModalProps {
@@ -27,7 +30,12 @@ export function AvailabilityModal({
   const { profile } = useAuth()
   const { addAvailability, updateAvailability, deleteAvailability } = useCalendar()
 
-  const userTimezone = profile?.timezone || 'Asia/Kolkata'
+  const [selectedTz, setSelectedTz] = useState<string>(() => {
+    if (profile?.timezone?.includes('Amsterdam') || profile?.timezone?.includes('Europe')) {
+      return EINDHOVEN_TIMEZONE
+    }
+    return IST_TIMEZONE
+  })
 
   const [type, setType] = useState<AvailabilityType>('FREE')
   const [date, setDate] = useState(() => {
@@ -44,8 +52,8 @@ export function AvailabilityModal({
   useEffect(() => {
     if (initialBlock) {
       setType(initialBlock.type)
-      const localStart = utcToLocalDateAndTimeString(initialBlock.start_time, userTimezone)
-      const localEnd = utcToLocalDateAndTimeString(initialBlock.end_time, userTimezone)
+      const localStart = utcToLocalDateAndTimeString(initialBlock.start_time, selectedTz)
+      const localEnd = utcToLocalDateAndTimeString(initialBlock.end_time, selectedTz)
       setDate(localStart.dateStr)
       setStartTime(localStart.timeStr)
       setEndTime(localEnd.timeStr)
@@ -58,17 +66,50 @@ export function AvailabilityModal({
       setIsRecurring(false)
     }
     setError(null)
-  }, [initialBlock, initialDate, userTimezone, isOpen])
+  }, [initialBlock, initialDate, selectedTz, isOpen])
+
+  const handleTimezoneChange = (newTz: string) => {
+    if (newTz === selectedTz) return
+    try {
+      const currentStartUtc = localToUtcIso(date, startTime, selectedTz)
+      const currentEndUtc = localToUtcIso(date, endTime, selectedTz)
+      const newStartLocal = utcToLocalDateAndTimeString(currentStartUtc, newTz)
+      const newEndLocal = utcToLocalDateAndTimeString(currentEndUtc, newTz)
+      setDate(newStartLocal.dateStr)
+      setStartTime(newStartLocal.timeStr)
+      setEndTime(newEndLocal.timeStr)
+    } catch {
+      // fallback
+    }
+    setSelectedTz(newTz)
+  }
 
   if (!isOpen) return null
+
+  // Calculate live preview in both IST and Eindhoven
+  let previewIstTime = ''
+  let previewIstDate = ''
+  let previewEindhovenTime = ''
+  let previewEindhovenDate = ''
+  try {
+    const startIso = localToUtcIso(date, startTime, selectedTz)
+    const endIso = localToUtcIso(date, endTime, selectedTz)
+    previewIstTime = `${formatTimeWithAbbr(startIso, IST_TIMEZONE)} – ${formatTimeWithAbbr(endIso, IST_TIMEZONE)}`
+    previewIstDate = formatDateInTz(startIso, IST_TIMEZONE)
+
+    previewEindhovenTime = `${formatTimeWithAbbr(startIso, EINDHOVEN_TIMEZONE)} – ${formatTimeWithAbbr(endIso, EINDHOVEN_TIMEZONE)}`
+    previewEindhovenDate = formatDateInTz(startIso, EINDHOVEN_TIMEZONE)
+  } catch {
+    // fallback
+  }
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
     setError(null)
 
     // Calculate UTC ISO
-    const startUtcIso = localToUtcIso(date, startTime, userTimezone)
-    const endUtcIso = localToUtcIso(date, endTime, userTimezone)
+    const startUtcIso = localToUtcIso(date, startTime, selectedTz)
+    const endUtcIso = localToUtcIso(date, endTime, selectedTz)
 
     if (new Date(endUtcIso).getTime() <= new Date(startUtcIso).getTime()) {
       setError('End time must be strictly after start time.')
@@ -141,7 +182,7 @@ export function AvailabilityModal({
                 {initialBlock ? 'Edit Availability' : 'Add Availability'}
               </h2>
               <p className="text-[11px] text-warm-600">
-                Times will be saved in your local timezone ({userTimezone})
+                Times converted and visible in both IST & Eindhoven
               </p>
             </div>
           </div>
@@ -195,10 +236,46 @@ export function AvailabilityModal({
             </div>
           </div>
 
+          {/* Timezone Selector */}
+          <div>
+            <label className="block text-xs font-semibold text-warm-800 mb-1.5 uppercase tracking-wider flex items-center justify-between">
+              <span>Set Time In</span>
+              <span className="text-[11px] text-warm-500 font-normal normal-case">
+                Select which timezone to enter
+              </span>
+            </label>
+            <div className="grid grid-cols-2 gap-2 p-1 bg-warm-100/70 rounded-xl border border-warm-200">
+              <button
+                type="button"
+                onClick={() => handleTimezoneChange(IST_TIMEZONE)}
+                className={`py-2 px-3 rounded-lg text-xs font-bold flex items-center justify-center gap-1.5 transition-all ${
+                  selectedTz === IST_TIMEZONE
+                    ? 'bg-white text-warm-950 shadow-soft-sm border border-warm-200'
+                    : 'text-warm-600 hover:text-warm-900'
+                }`}
+              >
+                <span>🇮🇳</span>
+                <span>IST (India)</span>
+              </button>
+              <button
+                type="button"
+                onClick={() => handleTimezoneChange(EINDHOVEN_TIMEZONE)}
+                className={`py-2 px-3 rounded-lg text-xs font-bold flex items-center justify-center gap-1.5 transition-all ${
+                  selectedTz === EINDHOVEN_TIMEZONE
+                    ? 'bg-white text-warm-950 shadow-soft-sm border border-warm-200'
+                    : 'text-warm-600 hover:text-warm-900'
+                }`}
+              >
+                <span>🇳🇱</span>
+                <span>Eindhoven (NL)</span>
+              </button>
+            </div>
+          </div>
+
           {/* Date Picker */}
           <div>
             <label className="block text-xs font-semibold text-warm-800 mb-1.5 uppercase tracking-wider">
-              Date
+              Date ({selectedTz === IST_TIMEZONE ? 'IST' : 'Eindhoven'})
             </label>
             <input
               type="date"
@@ -213,7 +290,7 @@ export function AvailabilityModal({
           <div className="grid grid-cols-2 gap-3">
             <div>
               <label className="block text-xs font-semibold text-warm-800 mb-1.5 uppercase tracking-wider">
-                Start Time
+                Start ({selectedTz === IST_TIMEZONE ? 'IST' : 'Eindhoven'})
               </label>
               <input
                 type="time"
@@ -226,7 +303,7 @@ export function AvailabilityModal({
 
             <div>
               <label className="block text-xs font-semibold text-warm-800 mb-1.5 uppercase tracking-wider">
-                End Time
+                End ({selectedTz === IST_TIMEZONE ? 'IST' : 'Eindhoven'})
               </label>
               <input
                 type="time"
@@ -235,6 +312,37 @@ export function AvailabilityModal({
                 required
                 className="w-full px-4 py-2.5 rounded-xl border border-warm-300 focus:outline-none focus:ring-2 focus:ring-warm-500/30 text-warm-900 text-sm bg-warm-50/30 font-mono"
               />
+            </div>
+          </div>
+
+          {/* Dual Local Time Conversion Preview Box */}
+          <div className="p-3.5 rounded-xl bg-warm-100/70 border border-warm-200/80 space-y-2">
+            <div className="text-[11px] font-bold text-warm-600 uppercase tracking-wider">
+              Calculated Times in Both Locations:
+            </div>
+            <div className="flex items-center justify-between text-xs bg-white/70 px-3 py-2 rounded-lg border border-warm-200/60">
+              <span className="text-warm-800 font-semibold flex items-center gap-1.5">
+                <span>🇮🇳</span>
+                <span>India (IST):</span>
+              </span>
+              <div className="text-right">
+                <span className="font-bold text-warm-950 font-mono">{previewIstTime}</span>
+                {previewIstDate && previewIstDate !== 'Today' && (
+                  <span className="text-[10px] text-warm-500 ml-1.5 font-sans">({previewIstDate})</span>
+                )}
+              </div>
+            </div>
+            <div className="flex items-center justify-between text-xs bg-white/70 px-3 py-2 rounded-lg border border-warm-200/60">
+              <span className="text-warm-800 font-semibold flex items-center gap-1.5">
+                <span>🇳🇱</span>
+                <span>Eindhoven (CET):</span>
+              </span>
+              <div className="text-right">
+                <span className="font-bold text-warm-950 font-mono">{previewEindhovenTime}</span>
+                {previewEindhovenDate && previewEindhovenDate !== 'Today' && (
+                  <span className="text-[10px] text-warm-500 ml-1.5 font-sans">({previewEindhovenDate})</span>
+                )}
+              </div>
             </div>
           </div>
 

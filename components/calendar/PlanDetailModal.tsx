@@ -19,6 +19,8 @@ import {
   formatDateInTz,
   formatTimeRangeInTz,
   getCountryFlag,
+  IST_TIMEZONE,
+  EINDHOVEN_TIMEZONE,
 } from '@/lib/timezones'
 import { UserAvatar } from '../ui/UserAvatar'
 
@@ -42,16 +44,11 @@ export function PlanDetailModal({
 
   if (!isOpen || !plan) return null
 
-  const userTimezone = profile?.timezone || 'Asia/Kolkata'
-  const partnerTimezone = partner?.timezone || 'Europe/Amsterdam'
+  const istDateFormatted = formatDateInTz(plan.start_time, IST_TIMEZONE)
+  const istTimeRange = formatTimeRangeInTz(plan.start_time, plan.end_time, IST_TIMEZONE, true)
 
-  const userDateFormatted = formatDateInTz(plan.start_time, userTimezone)
-  const userTimeRange = formatTimeRangeInTz(plan.start_time, plan.end_time, userTimezone, true)
-
-  const partnerDateFormatted = partner ? formatDateInTz(plan.start_time, partnerTimezone) : ''
-  const partnerTimeRange = partner
-    ? formatTimeRangeInTz(plan.start_time, plan.end_time, partnerTimezone, true)
-    : ''
+  const eindhovenDateFormatted = formatDateInTz(plan.start_time, EINDHOVEN_TIMEZONE)
+  const eindhovenTimeRange = formatTimeRangeInTz(plan.start_time, plan.end_time, EINDHOVEN_TIMEZONE, true)
 
   const isCreator = user?.id === plan.created_by
 
@@ -107,47 +104,45 @@ export function PlanDetailModal({
 
           {/* Times in both zones */}
           <div className="rounded-2xl bg-warm-50/80 border border-warm-200/80 p-4 space-y-3">
-            {/* User time */}
+            {/* India (IST) */}
             <div className="flex items-start justify-between">
-              <div className="flex items-center gap-2">
-                <span className="text-xl">{getCountryFlag(profile?.country)}</span>
+              <div className="flex items-center gap-2.5">
+                <span className="text-2xl">🇮🇳</span>
                 <div>
                   <div className="text-xs font-bold text-warm-900">
-                    {profile?.name || 'You'} ({profile?.country || 'Local'})
+                    India (IST)
                   </div>
                   <div className="text-[11px] text-warm-600 font-medium">
-                    {userDateFormatted}
+                    {istDateFormatted}
                   </div>
                 </div>
               </div>
               <div className="text-right">
-                <span className="text-sm font-bold text-warm-900 font-mono">
-                  {userTimeRange}
+                <span className="text-sm font-bold text-warm-950 font-mono">
+                  {istTimeRange}
                 </span>
               </div>
             </div>
 
-            {/* Partner time */}
-            {partner && (
-              <div className="flex items-start justify-between pt-2.5 border-t border-warm-200/60">
-                <div className="flex items-center gap-2">
-                  <span className="text-xl">{getCountryFlag(partner.country)}</span>
-                  <div>
-                    <div className="text-xs font-bold text-warm-900">
-                      {partner.name} ({partner.country || 'Partner'})
-                    </div>
-                    <div className="text-[11px] text-warm-600 font-medium">
-                      {partnerDateFormatted}
-                    </div>
+            {/* Eindhoven (Netherlands) */}
+            <div className="flex items-start justify-between pt-2.5 border-t border-warm-200/60">
+              <div className="flex items-center gap-2.5">
+                <span className="text-2xl">🇳🇱</span>
+                <div>
+                  <div className="text-xs font-bold text-warm-900">
+                    Eindhoven (CET/CEST)
+                  </div>
+                  <div className="text-[11px] text-warm-600 font-medium">
+                    {eindhovenDateFormatted}
                   </div>
                 </div>
-                <div className="text-right">
-                  <span className="text-sm font-bold text-warm-900 font-mono">
-                    {partnerTimeRange}
-                  </span>
-                </div>
               </div>
-            )}
+              <div className="text-right">
+                <span className="text-sm font-bold text-warm-950 font-mono">
+                  {eindhovenTimeRange}
+                </span>
+              </div>
+            </div>
           </div>
 
           {/* Location */}

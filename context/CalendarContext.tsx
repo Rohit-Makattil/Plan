@@ -52,7 +52,7 @@ const CalendarContext = createContext<CalendarContextType | undefined>(undefined
 
 export function CalendarProvider({ children }: { children: React.ReactNode }) {
   const [supabase] = useState(() => createClient())
-  const { user, calendar } = useAuth()
+  const { user, profile, partner, calendar } = useAuth()
   const [availabilityBlocks, setAvailabilityBlocks] = useState<AvailabilityBlock[]>([])
   const [events, setEvents] = useState<CalendarEvent[]>([])
   const [loading, setLoading] = useState(true)
@@ -68,38 +68,60 @@ export function CalendarProvider({ children }: { children: React.ReactNode }) {
 
     setLoading(true)
     try {
-      // 1. Fetch Availability Blocks with Profiles
+      // 1. Fetch Availability Blocks
       const { data: availData, error: availErr } = await supabase
         .from('availability_blocks')
-        .select('*, profiles (*)')
+        .select('*')
         .eq('calendar_id', calendar.id)
         .order('start_time', { ascending: true })
 
       if (availErr) {
         console.error('Error fetching availability:', availErr)
-      } else if (availData) {
-        setAvailabilityBlocks(
-          availData.map((item) => ({
-            ...item,
-            profile: item.profiles,
-          })) as AvailabilityBlock[]
-        )
       }
 
-      // 2. Fetch Events with Creator Profile
+      // 2. Fetch Events
       const { data: eventsData, error: eventsErr } = await supabase
         .from('events')
-        .select('*, profiles:created_by (*)')
+        .select('*')
         .eq('calendar_id', calendar.id)
         .order('start_time', { ascending: true })
 
       if (eventsErr) {
         console.error('Error fetching events:', eventsErr)
-      } else if (eventsData) {
+      }
+
+      // Collect user profiles needed
+      const userIds = new Set<string>()
+      availData?.forEach((b) => userIds.add(b.user_id))
+      eventsData?.forEach((e) => userIds.add(e.created_by))
+
+      const profileMap = new Map<string, any>()
+      if (profile?.id) profileMap.set(profile.id, profile)
+      if (partner?.id) profileMap.set(partner.id, partner)
+
+      const missingIds = Array.from(userIds).filter((id) => !profileMap.has(id))
+      if (missingIds.length > 0) {
+        const { data: profs } = await supabase
+          .from('profiles')
+          .select('*')
+          .in('id', missingIds)
+        profs?.forEach((p) => profileMap.set(p.id, p))
+      }
+
+      if (availData) {
+        setAvailabilityBlocks(
+          availData.map((item) => ({
+            ...item,
+            profile: profileMap.get(item.user_id) || undefined,
+          })) as AvailabilityBlock[]
+        )
+      }
+
+      if (eventsData) {
         setEvents(
           eventsData.map((item) => ({
             ...item,
-            creator_profile: item.profiles,
+            creator_profile: profileMap.get(item.created_by) || undefined,
           })) as CalendarEvent[]
         )
       }
@@ -108,7 +130,7 @@ export function CalendarProvider({ children }: { children: React.ReactNode }) {
     } finally {
       setLoading(false)
     }
-  }, [calendar?.id, supabase])
+  }, [calendar?.id, profile, partner, supabase])
 
   // Initial load
   useEffect(() => {
@@ -177,12 +199,16 @@ export function CalendarProvider({ children }: { children: React.ReactNode }) {
           end_time: endTime,
           recurrence_rule: recurrenceRule || null,
         })
-        .select('*, profiles (*)')
+        .select('*')
         .single()
 
       if (error) return { error }
+      const newBlock: AvailabilityBlock = {
+        ...(data as any),
+        profile: profile || undefined,
+      }
       await fetchAllCalendarData()
-      return { error: null, data: data as AvailabilityBlock }
+      return { error: null, data: newBlock }
     } catch (err: any) {
       return { error: err }
     }
@@ -279,12 +305,16 @@ export function CalendarProvider({ children }: { children: React.ReactNode }) {
           location: location ? location.trim() : null,
           audience,
         })
-        .select('*, profiles:created_by (*)')
+        .select('*')
         .single()
 
       if (error) return { error }
+      const newEvent: CalendarEvent = {
+        ...(data as any),
+        creator_profile: profile || undefined,
+      }
       await fetchAllCalendarData()
-      return { error: null, data: data as CalendarEvent }
+      return { error: null, data: newEvent }
     } catch (err: any) {
       return { error: err }
     }

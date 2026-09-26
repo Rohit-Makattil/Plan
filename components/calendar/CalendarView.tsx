@@ -1,6 +1,6 @@
 'use client'
 
-import React, { useState } from 'react'
+import React, { useState, useEffect } from 'react'
 import {
   ChevronLeft,
   ChevronRight,
@@ -10,6 +10,7 @@ import {
   HeartHandshake,
   Users,
   Repeat,
+  Globe,
 } from 'lucide-react'
 import { AvailabilityBlock, CalendarEvent } from '@/types/database'
 import { useAuth } from '@/context/AuthContext'
@@ -18,6 +19,9 @@ import {
   formatTimeRangeInTz,
   utcToLocalDateAndTimeString,
   getCountryFlag,
+  IST_TIMEZONE,
+  EINDHOVEN_TIMEZONE,
+  formatDateInTz,
 } from '@/lib/timezones'
 import { expandAvailability } from '@/lib/find-time'
 
@@ -41,11 +45,32 @@ export function CalendarView({
   onCreatePlan,
 }: CalendarViewProps) {
   const { profile, partner, user } = useAuth()
-  const userTz = profile?.timezone || 'Asia/Kolkata'
-  const partnerTz = partner?.timezone || 'Europe/Amsterdam'
+  const userTz = profile?.timezone || IST_TIMEZONE
+  const partnerTz = partner?.timezone || EINDHOVEN_TIMEZONE
 
   const [viewMode, setViewMode] = useState<ViewMode>('WEEK')
   const [currentDate, setCurrentDate] = useState(new Date())
+
+  // Live clock for IST and Eindhoven
+  const [now, setNow] = useState(new Date())
+  useEffect(() => {
+    const timer = setInterval(() => setNow(new Date()), 10000)
+    return () => clearInterval(timer)
+  }, [])
+
+  const istNow = new Intl.DateTimeFormat('en-US', {
+    timeZone: IST_TIMEZONE,
+    hour: 'numeric',
+    minute: '2-digit',
+    hour12: true,
+  }).format(now)
+
+  const eindhovenNow = new Intl.DateTimeFormat('en-US', {
+    timeZone: EINDHOVEN_TIMEZONE,
+    hour: 'numeric',
+    minute: '2-digit',
+    hour12: true,
+  }).format(now)
 
   // Navigation handlers
   const handlePrev = () => {
@@ -223,6 +248,28 @@ export function CalendarView({
         </div>
       </div>
 
+      {/* Dual Timezone Live Banner */}
+      <div className="px-4 py-2.5 bg-gradient-to-r from-amber-500/10 via-warm-100 to-indigo-500/10 border-b border-warm-200/80 flex flex-wrap items-center justify-between gap-3 text-xs">
+        <div className="flex items-center gap-2.5">
+          <div className="flex items-center gap-1.5 bg-white/90 px-3 py-1 rounded-xl border border-warm-200 shadow-soft-xs">
+            <span>🇮🇳</span>
+            <span className="font-bold text-warm-900">IST (India):</span>
+            <span className="font-mono font-bold text-warm-950">{istNow}</span>
+          </div>
+          <span className="text-warm-400 font-bold hidden sm:inline">⇄</span>
+          <div className="flex items-center gap-1.5 bg-white/90 px-3 py-1 rounded-xl border border-warm-200 shadow-soft-xs">
+            <span>🇳🇱</span>
+            <span className="font-bold text-warm-900">Eindhoven (NL):</span>
+            <span className="font-mono font-bold text-warm-950">{eindhovenNow}</span>
+          </div>
+        </div>
+
+        <div className="text-[11px] font-medium text-warm-600 bg-white/70 px-2.5 py-1 rounded-lg border border-warm-200/60 flex items-center gap-1.5 ml-auto sm:ml-0">
+          <Globe className="w-3.5 h-3.5 text-warm-600" />
+          <span>Both timezones shown together on all items</span>
+        </div>
+      </div>
+
       {/* Legend */}
       <div className="px-5 py-2.5 bg-warm-50/20 border-b border-warm-100 flex flex-wrap items-center gap-4 text-[11px] text-warm-700">
         <div className="flex items-center gap-1.5 font-medium">
@@ -313,8 +360,22 @@ export function CalendarView({
                           <span>{evt.audience === 'FRIENDS' ? '🥂' : '❤️'}</span>
                           <span className="truncate">{evt.title}</span>
                         </div>
-                        <div className="text-[10px] font-mono font-medium opacity-85 mt-0.5">
-                          {formatTimeInTz(evt.start_time, userTz)}
+                        {/* Dual Timezone Display on Plan Card */}
+                        <div className="text-[10px] font-mono mt-1 pt-1 border-t border-rose-200/60 space-y-0.5">
+                          <div className="flex items-center justify-between text-warm-950 font-semibold">
+                            <span className="flex items-center gap-1">
+                              <span>🇮🇳</span>
+                              <span>IST</span>
+                            </span>
+                            <span>{formatTimeInTz(evt.start_time, IST_TIMEZONE)}</span>
+                          </div>
+                          <div className="flex items-center justify-between text-warm-700">
+                            <span className="flex items-center gap-1">
+                              <span>🇳🇱</span>
+                              <span>Eindhoven</span>
+                            </span>
+                            <span>{formatTimeInTz(evt.start_time, EINDHOVEN_TIMEZONE)}</span>
+                          </div>
                         </div>
                       </div>
                     ))}
@@ -348,8 +409,22 @@ export function CalendarView({
                               {blk.type}
                             </span>
                           </div>
-                          <div className="text-[10px] font-mono mt-0.5 text-warm-600">
-                            {formatTimeRangeInTz(blk.start_time, blk.end_time, userTz, false)}
+                          {/* Dual Timezone Display on Availability Block */}
+                          <div className="text-[10px] font-mono mt-1 pt-1 border-t border-warm-200/60 space-y-0.5 text-warm-700">
+                            <div className="flex items-center justify-between">
+                              <span className="flex items-center gap-1">
+                                <span>🇮🇳</span>
+                                <span>IST:</span>
+                              </span>
+                              <span>{formatTimeRangeInTz(blk.start_time, blk.end_time, IST_TIMEZONE, false)}</span>
+                            </div>
+                            <div className="flex items-center justify-between text-warm-600">
+                              <span className="flex items-center gap-1">
+                                <span>🇳🇱</span>
+                                <span>NL:</span>
+                              </span>
+                              <span>{formatTimeRangeInTz(blk.start_time, blk.end_time, EINDHOVEN_TIMEZONE, false)}</span>
+                            </div>
                           </div>
                         </div>
                       )
@@ -433,13 +508,15 @@ export function CalendarView({
                             </span>
                             <span className="font-bold text-sm text-warm-950">{evt.title}</span>
                           </div>
-                          <div className="text-xs text-warm-600 font-mono mt-1">
-                            {formatTimeRangeInTz(evt.start_time, evt.end_time, userTz, true)}
-                            {partner && (
-                              <span className="ml-2 text-warm-500">
-                                ({partner.name}: {formatTimeRangeInTz(evt.start_time, evt.end_time, partnerTz, true)})
-                              </span>
-                            )}
+                          <div className="flex flex-wrap items-center gap-2 mt-2 font-mono text-xs">
+                            <span className="px-2.5 py-1 rounded-lg bg-amber-50 border border-amber-200 text-amber-950 font-medium flex items-center gap-1.5">
+                              <span>🇮🇳</span>
+                              <span>IST: {formatTimeRangeInTz(evt.start_time, evt.end_time, IST_TIMEZONE, true)}</span>
+                            </span>
+                            <span className="px-2.5 py-1 rounded-lg bg-blue-50 border border-blue-200 text-blue-950 font-medium flex items-center gap-1.5">
+                              <span>🇳🇱</span>
+                              <span>Eindhoven: {formatTimeRangeInTz(evt.start_time, evt.end_time, EINDHOVEN_TIMEZONE, true)}</span>
+                            </span>
                           </div>
                         </div>
                       </div>
@@ -479,9 +556,16 @@ export function CalendarView({
                                 ? 'Your Availability'
                                 : `${blk.profile?.name || 'Partner'}'s Availability`}
                             </span>
-                            <span className="text-xs font-mono block text-warm-600">
-                              {formatTimeRangeInTz(blk.start_time, blk.end_time, userTz, true)}
-                            </span>
+                            <div className="text-xs font-mono mt-1 space-y-0.5">
+                              <div className="flex items-center gap-1.5 text-warm-800">
+                                <span>🇮🇳</span>
+                                <span>IST: {formatTimeRangeInTz(blk.start_time, blk.end_time, IST_TIMEZONE, true)}</span>
+                              </div>
+                              <div className="flex items-center gap-1.5 text-warm-600">
+                                <span>🇳🇱</span>
+                                <span>Eindhoven: {formatTimeRangeInTz(blk.start_time, blk.end_time, EINDHOVEN_TIMEZONE, true)}</span>
+                              </div>
+                            </div>
                           </div>
                         </div>
                         <span
@@ -574,12 +658,15 @@ export function CalendarView({
                     </div>
 
                     <div className="space-y-1 my-1">
-                      {dayEvents.slice(0, 1).map((e) => (
+                      {dayEvents.slice(0, 2).map((e) => (
                         <div
                           key={e.id}
-                          className="text-[9px] font-bold px-1 py-0.5 rounded bg-rose-100 text-rose-800 truncate"
+                          className="text-[9px] font-bold p-1 rounded bg-rose-100 text-rose-900 truncate"
                         >
-                          {e.title}
+                          <div className="truncate">{e.title}</div>
+                          <div className="text-[8px] font-mono text-rose-700 opacity-90 truncate">
+                            🇮🇳 {formatTimeInTz(e.start_time, IST_TIMEZONE)} · 🇳🇱 {formatTimeInTz(e.start_time, EINDHOVEN_TIMEZONE)}
+                          </div>
                         </div>
                       ))}
                       {dayAvail.length > 0 && (

@@ -356,3 +356,49 @@ export function utcToLocalDateAndTimeString(
     }
   }
 }
+
+export const IST_TIMEZONE = 'Asia/Kolkata'
+export const EINDHOVEN_TIMEZONE = 'Europe/Amsterdam'
+
+/**
+ * Formats a single timestamp in both IST and Eindhoven (or custom) timezones
+ * Example: "🇮🇳 8:30 PM · 🇳🇱 5:00 PM"
+ */
+export function formatDualTime(
+  utcIso: string | Date,
+  tz1: string = IST_TIMEZONE,
+  tz2: string = EINDHOVEN_TIMEZONE
+): string {
+  const t1 = formatTimeInTz(utcIso, tz1)
+  const t2 = formatTimeInTz(utcIso, tz2)
+  const flag1 = getCountryFlag(tz1)
+  const flag2 = getCountryFlag(tz2)
+  return `${flag1} ${t1} · ${flag2} ${t2}`
+}
+
+/**
+ * Formats start and end times in both IST and Eindhoven (or custom) timezones
+ */
+export function formatDualTimeRange(
+  startUtcIso: string | Date,
+  endUtcIso: string | Date,
+  tz1: string = IST_TIMEZONE,
+  tz2: string = EINDHOVEN_TIMEZONE
+): {
+  tz1Text: string
+  tz2Text: string
+  combined: string
+} {
+  const range1 = formatTimeRangeInTz(startUtcIso, endUtcIso, tz1, false)
+  const range2 = formatTimeRangeInTz(startUtcIso, endUtcIso, tz2, false)
+  const flag1 = getCountryFlag(tz1)
+  const flag2 = getCountryFlag(tz2)
+  const name1 = tz1 === IST_TIMEZONE ? 'IST' : tz1.split('/').pop()?.replace('_', ' ') || 'You'
+  const name2 = tz2 === EINDHOVEN_TIMEZONE ? 'Eindhoven' : tz2.split('/').pop()?.replace('_', ' ') || 'Partner'
+
+  return {
+    tz1Text: `${flag1} ${name1}: ${range1}`,
+    tz2Text: `${flag2} ${name2}: ${range2}`,
+    combined: `${flag1} ${range1} · ${flag2} ${range2}`,
+  }
+}

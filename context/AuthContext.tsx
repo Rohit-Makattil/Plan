@@ -51,7 +51,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         .from('profiles')
         .select('*')
         .eq('id', userId)
-        .single()
+        .maybeSingle()
 
       if (error && error.code !== 'PGRST116') {
         console.error('Error fetching profile:', error)
@@ -112,15 +112,20 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       // Fetch partner info (the other member in this calendar)
       const { data: allMembers, error: allMembersErr } = await supabase
         .from('calendar_members')
-        .select('user_id, role, profiles (*)')
+        .select('user_id, role')
         .eq('calendar_id', activeMember.calendar_id)
 
       if (allMembersErr) {
         console.error('Error fetching all members:', allMembersErr)
       } else if (allMembers) {
         const partnerRow = allMembers.find((m) => m.user_id !== userId)
-        if (partnerRow && partnerRow.profiles) {
-          setPartner(partnerRow.profiles as unknown as Profile)
+        if (partnerRow) {
+          const { data: partnerProf } = await supabase
+            .from('profiles')
+            .select('*')
+            .eq('id', partnerRow.user_id)
+            .maybeSingle()
+          setPartner((partnerProf as Profile) || null)
         } else {
           setPartner(null)
         }
@@ -386,7 +391,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         .from('shared_calendars')
         .select('*')
         .ilike('invite_code', code)
-        .single()
+        .maybeSingle()
 
       if (calErr || !cal) {
         return { success: false, error: 'Invalid invite code. Please check and try again.' }
